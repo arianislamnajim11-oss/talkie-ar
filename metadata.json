@@ -1,0 +1,10 @@
+{
+  "name": "Talkie AR — Global Speaking, Social, Gaming & AI Learning Platform",
+  "description": "Speak English globally, join live voice rooms, international communities, multiplayer speaking games, AI Coach, CEFR assessments and verifiable certificates.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
