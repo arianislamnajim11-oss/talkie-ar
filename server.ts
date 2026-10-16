@@ -13,9 +13,190 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// In-memory persistent database for state during execution
+interface ServerRoom {
+  id: string;
+  title: string;
+  description: string;
+  topic: string;
+  category: string;
+  language: string;
+  level: string;
+  hostId: string;
+  hostName: string;
+  hostAvatar: string;
+  hostCountryCode: string;
+  capacity: number;
+  isPrivate: boolean;
+  password?: string;
+  rules?: string;
+  isBeginnerFriendly: boolean;
+  speakingMode: string;
+  status: 'active' | 'closed';
+  timerSeconds?: number;
+  activeTopicPrompt?: string;
+  participants: any[];
+  tags: string[];
+  createdAt: string;
+}
+
+// In-memory persistent database
 let db = {
+  users: [
+    {
+      id: 'usr_me_001',
+      username: 'arian_global',
+      displayName: 'Arian Islam',
+      email: 'arian@talkiear.com',
+      password: 'password123',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+      country: 'Bangladesh',
+      countryCode: 'BD',
+      nativeLanguage: 'Bengali',
+      targetLanguage: 'English',
+      englishLevel: 'Upper-Intermediate',
+      cefrLevel: 'B2',
+      bio: 'Software engineer & English speaker. Practicing for conferences and tech debates!',
+      streakDays: 14,
+      totalPracticeMinutes: 840,
+      isPremium: false,
+      role: 'user',
+      presence: 'online',
+      customStatus: 'Practicing for conference debate 🎙️'
+    },
+    {
+      id: 'usr_maya_002',
+      username: 'maya_tokyo',
+      displayName: 'Maya Tanaka',
+      email: 'maya@talkiear.com',
+      password: 'password123',
+      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
+      country: 'Japan',
+      countryCode: 'JP',
+      nativeLanguage: 'Japanese',
+      targetLanguage: 'English',
+      englishLevel: 'Intermediate',
+      cefrLevel: 'B1',
+      bio: 'Tokyo graphic designer preparing for international freelance projects.',
+      streakDays: 9,
+      totalPracticeMinutes: 420,
+      isPremium: false,
+      role: 'user',
+      presence: 'online',
+      customStatus: 'Coffee & English practice ☕'
+    },
+    {
+      id: 'usr_carlos_003',
+      username: 'carlos_madrid',
+      displayName: 'Carlos Mendez',
+      email: 'carlos@talkiear.com',
+      password: 'password123',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
+      country: 'Spain',
+      countryCode: 'ES',
+      nativeLanguage: 'Spanish',
+      targetLanguage: 'English',
+      englishLevel: 'Advanced',
+      cefrLevel: 'C1',
+      bio: 'Hospital doctor in Madrid looking to master international presentations.',
+      streakDays: 28,
+      totalPracticeMinutes: 1650,
+      isPremium: true,
+      role: 'mentor',
+      presence: 'online',
+      customStatus: 'Hosting Science Club tonight'
+    }
+  ],
+  rooms: <ServerRoom[]>[
+    {
+      id: 'rm_ielts_01',
+      title: '🎯 IELTS Speaking Band 7.5+ Practice & Feedback',
+      description: 'We take turns answering Part 2 cue cards and Part 3 abstract questions. Friendly feedback on vocabulary, fluency, and coherence.',
+      topic: 'Cue Cards: Describe an ambitious project you completed',
+      category: 'IELTS Practice',
+      language: 'English',
+      level: 'Upper-Intermediate',
+      hostId: 'usr_carlos_003',
+      hostName: 'Carlos Mendez',
+      hostAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
+      hostCountryCode: 'ES',
+      capacity: 6,
+      isPrivate: false,
+      isBeginnerFriendly: false,
+      speakingMode: 'interview',
+      status: 'active',
+      timerSeconds: 120,
+      activeTopicPrompt: 'Describe a memorable journey you went on. Say where you went and why it was memorable.',
+      participants: [
+        {
+          userId: 'usr_carlos_003',
+          displayName: 'Carlos Mendez',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=250&q=80',
+          countryCode: 'ES',
+          level: 'Advanced',
+          role: 'host',
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: true,
+          raisedHand: false,
+          joinedAt: '2026-10-14T21:42:00Z'
+        },
+        {
+          userId: 'usr_maya_002',
+          displayName: 'Maya Tanaka',
+          avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
+          countryCode: 'JP',
+          level: 'Intermediate',
+          role: 'speaker',
+          isMuted: true,
+          isDeafened: false,
+          isSpeaking: false,
+          raisedHand: false,
+          joinedAt: '2026-10-14T21:45:00Z'
+        }
+      ],
+      tags: ['IELTS', 'Exam Prep', 'Cue Cards'],
+      createdAt: '2026-10-14T21:30:00Z'
+    },
+    {
+      id: 'rm_coffee_02',
+      title: '☕ Cozy Morning Coffee & Casual Chats (All Levels)',
+      description: 'No pressure, zero judgment! Grab your favorite drink, share how your week went, discuss favorite foods.',
+      topic: 'What is your absolute favorite comfort food from your country?',
+      category: 'Everyday English',
+      language: 'English',
+      level: 'All Levels',
+      hostId: 'usr_maya_002',
+      hostName: 'Maya Tanaka',
+      hostAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
+      hostCountryCode: 'JP',
+      capacity: 8,
+      isPrivate: false,
+      isBeginnerFriendly: true,
+      speakingMode: 'free',
+      status: 'active',
+      activeTopicPrompt: 'Introduce yourself and share what dish you crave when tired!',
+      participants: [
+        {
+          userId: 'usr_maya_002',
+          displayName: 'Maya Tanaka',
+          avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
+          countryCode: 'JP',
+          level: 'Intermediate',
+          role: 'host',
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: false,
+          raisedHand: false,
+          joinedAt: '2026-10-14T21:50:00Z'
+        }
+      ],
+      tags: ['Casual', 'Beginner Friendly', 'Food'],
+      createdAt: '2026-10-14T21:48:00Z'
+    }
+  ],
+  roomMessages: {} as Record<string, any[]>,
   certificates: [
     {
       id: 'TAR-2026-B2901X',
@@ -34,24 +215,6 @@ let db = {
         { name: 'Grammatical Accuracy & Range', score: 82 },
         { name: 'Listening & Comprehension', score: 84 }
       ]
-    },
-    {
-      id: 'TAR-2026-C1844M',
-      candidateName: 'Carlos Mendez',
-      userId: 'usr_carlos_003',
-      cefrLevel: 'C1',
-      levelTitle: 'Advanced English',
-      scorePercentage: 91,
-      issueDate: '2026-09-18',
-      verificationCode: 'TAR-2026-C1844M',
-      status: 'valid',
-      issuer: 'Talkie AR Global Assessment Council',
-      skills: [
-        { name: 'Spoken Fluency & Coherence', score: 94 },
-        { name: 'Lexical Resource & Idioms', score: 90 },
-        { name: 'Grammatical Accuracy & Range', score: 92 },
-        { name: 'Listening & Comprehension', score: 95 }
-      ]
     }
   ],
   reports: [
@@ -60,18 +223,9 @@ let db = {
       targetType: 'user',
       targetName: 'SuspiciousBot#992',
       reason: 'Repetitive spam links in room chat',
-      reporterName: 'Fatima Al-Sayed',
+      reporterName: 'Carlos Mendez',
       timestamp: '2026-10-14 20:15',
       status: 'pending'
-    },
-    {
-      id: 'rep_102',
-      targetType: 'room',
-      targetName: 'Random Screaming Room',
-      reason: 'Disruptive audio and unmoderated noise',
-      reporterName: 'Carlos Mendez',
-      timestamp: '2026-10-14 18:40',
-      status: 'reviewed'
     }
   ],
   stats: {
@@ -94,11 +248,261 @@ if (process.env.GEMINI_API_KEY) {
 }
 
 // -------------------------------------------------------------
+// Authentication Endpoints (Open Registration & Login)
+// -------------------------------------------------------------
+app.post('/api/auth/register', (req, res) => {
+  const { username, email, displayName, password, country = 'United States', countryCode = 'US', englishLevel = 'Intermediate' } = req.body;
+  if (!username || !email) {
+    return res.status(400).json({ error: 'Username and email are required.' });
+  }
+
+  const existing = db.users.find(u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase());
+  if (existing) {
+    return res.status(400).json({ error: 'Username or email already in use.' });
+  }
+
+  const newUser = {
+    id: 'usr_' + Date.now(),
+    username: username.trim().toLowerCase(),
+    displayName: displayName?.trim() || username.trim(),
+    email: email.trim().toLowerCase(),
+    password: password || 'password123',
+    avatar: `https://images.unsplash.com/photo-${1534528741775 + (db.users.length * 1000)}?auto=format&fit=crop&w=250&q=80`,
+    country,
+    countryCode,
+    nativeLanguage: 'English',
+    targetLanguage: 'English',
+    englishLevel: englishLevel as any,
+    cefrLevel: 'B1' as any,
+    bio: 'New global learner ready to speak!',
+    streakDays: 1,
+    totalPracticeMinutes: 0,
+    isPremium: false,
+    role: 'user' as const,
+    presence: 'online' as const,
+    customStatus: 'Ready to speak!'
+  };
+
+  db.users.push(newUser);
+  return res.json({ success: true, user: newUser });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { usernameOrEmail } = req.body;
+  if (!usernameOrEmail) {
+    return res.status(400).json({ error: 'Username or email is required.' });
+  }
+
+  const user = db.users.find(u => 
+    u.username.toLowerCase() === usernameOrEmail.toLowerCase() || 
+    u.email.toLowerCase() === usernameOrEmail.toLowerCase()
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found. Try registering a new account!' });
+  }
+
+  return res.json({ success: true, user });
+});
+
+app.get('/api/users', (req, res) => {
+  return res.json(db.users.map(({ password, ...u }) => u));
+});
+
+// -------------------------------------------------------------
+// Speaking Rooms Endpoints (Free4Talk-Style Core)
+// -------------------------------------------------------------
+app.get('/api/rooms', (req, res) => {
+  // Return all active rooms
+  const activeRooms = db.rooms.filter(r => r.status !== 'closed');
+  return res.json(activeRooms);
+});
+
+app.post('/api/rooms', (req, res) => {
+  const {
+    title,
+    topic,
+    description,
+    category = 'Everyday English',
+    language = 'English',
+    level = 'All Levels',
+    capacity = 6,
+    isPrivate = false,
+    password,
+    rules,
+    isBeginnerFriendly = true,
+    speakingMode = 'free',
+    hostUser
+  } = req.body;
+
+  if (!title || !title.trim()) {
+    return res.status(400).json({ error: 'Room title is required.' });
+  }
+
+  const host = hostUser || db.users[0];
+
+  const newRoom = {
+    id: 'rm_' + Date.now(),
+    title: title.trim(),
+    description: description?.trim() || 'Open spoken conversation. Jump in and say hello!',
+    topic: topic?.trim() || 'General conversation & cultural exchange',
+    category,
+    language,
+    level,
+    hostId: host.id,
+    hostName: host.displayName,
+    hostAvatar: host.avatar,
+    hostCountryCode: host.countryCode || 'US',
+    capacity: Math.min(12, Math.max(2, parseInt(capacity) || 6)),
+    isPrivate: !!isPrivate,
+    password: password ? String(password).trim() : undefined,
+    rules: rules ? String(rules).trim() : undefined,
+    isBeginnerFriendly: !!isBeginnerFriendly,
+    speakingMode: speakingMode as any,
+    status: 'active' as const,
+    activeTopicPrompt: topic || 'Share your thoughts and experiences!',
+    participants: [
+      {
+        userId: host.id,
+        displayName: host.displayName,
+        avatar: host.avatar,
+        countryCode: host.countryCode || 'US',
+        level: host.englishLevel || 'Intermediate',
+        role: 'host' as const,
+        isMuted: false,
+        isDeafened: false,
+        isSpeaking: false,
+        raisedHand: false,
+        joinedAt: new Date().toISOString()
+      }
+    ],
+    tags: [category, language, level],
+    createdAt: new Date().toISOString()
+  };
+
+  db.rooms.unshift(newRoom);
+  return res.json({ success: true, room: newRoom });
+});
+
+app.get('/api/rooms/:id', (req, res) => {
+  const room = db.rooms.find(r => r.id === req.params.id);
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+  return res.json(room);
+});
+
+app.post('/api/rooms/:id/join', (req, res) => {
+  const { user, password } = req.body;
+  if (!user || !user.id) {
+    return res.status(401).json({ error: 'Authentication required to join speaking room.' });
+  }
+
+  const room = db.rooms.find(r => r.id === req.params.id);
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  if (room.status === 'closed') {
+    return res.status(410).json({ error: 'This room has been closed by the host.' });
+  }
+
+  // Capacity check
+  if (room.participants.length >= room.capacity) {
+    return res.status(403).json({ error: 'Room is at full capacity. Please try another room or create your own.' });
+  }
+
+  // Password check for private rooms
+  if (room.isPrivate && room.password) {
+    if (room.password !== password) {
+      return res.status(403).json({ error: 'Incorrect room password.' });
+    }
+  }
+
+  // Check if already in room
+  const alreadyIn = room.participants.some(p => p.userId === user.id);
+  if (!alreadyIn) {
+    room.participants.push({
+      userId: user.id,
+      displayName: user.displayName,
+      avatar: user.avatar,
+      countryCode: user.countryCode || 'US',
+      level: user.englishLevel || 'Intermediate',
+      role: 'speaker',
+      isMuted: false,
+      isDeafened: false,
+      isSpeaking: false,
+      raisedHand: false,
+      joinedAt: new Date().toISOString()
+    });
+  }
+
+  return res.json({ success: true, room });
+});
+
+app.post('/api/rooms/:id/leave', (req, res) => {
+  const { userId } = req.body;
+  const room = db.rooms.find(r => r.id === req.params.id);
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  room.participants = room.participants.filter(p => p.userId !== userId);
+  return res.json({ success: true, room });
+});
+
+app.post('/api/rooms/:id/close', (req, res) => {
+  const { hostId } = req.body;
+  const room = db.rooms.find(r => r.id === req.params.id);
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found.' });
+  }
+
+  if (room.hostId !== hostId) {
+    return res.status(403).json({ error: 'Only the room creator/host can close this room.' });
+  }
+
+  room.status = 'closed';
+  room.participants = [];
+  return res.json({ success: true, message: 'Room successfully closed.' });
+});
+
+// In-room Chat Messages
+app.get('/api/rooms/:id/messages', (req, res) => {
+  const messages = db.roomMessages[req.params.id] || [];
+  return res.json(messages);
+});
+
+app.post('/api/rooms/:id/messages', (req, res) => {
+  const { senderId, senderName, senderAvatar, content } = req.body;
+  if (!content || !content.trim()) {
+    return res.status(400).json({ error: 'Message cannot be empty.' });
+  }
+
+  const newMsg = {
+    id: 'rmsg_' + Date.now(),
+    roomId: req.params.id,
+    senderId,
+    senderName,
+    senderAvatar,
+    content: content.trim(),
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+
+  if (!db.roomMessages[req.params.id]) {
+    db.roomMessages[req.params.id] = [];
+  }
+  db.roomMessages[req.params.id].push(newMsg);
+
+  return res.json({ success: true, message: newMsg });
+});
+
+// -------------------------------------------------------------
 // AI Speaking Coach Endpoint
 // -------------------------------------------------------------
 app.post('/api/ai-coach/chat', async (req, res) => {
   try {
-    const { message, topic = 'Everyday English', persona = 'Friendly Mentor', userLevel = 'Intermediate', history = [] } = req.body;
+    const { message, topic = 'Everyday English', persona = 'Friendly Mentor', userLevel = 'Intermediate' } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -185,7 +589,6 @@ app.post('/api/assessments/submit', (req, res) => {
     const { userName, answers, totalQuestions = 6 } = req.body;
     let correctCount = 0;
     
-    // Evaluate standard answers: Question 1: 1, Question 2: 1, Question 3: 1, Question 4: 1, Question 5: 1, Question 6 (Speaking text length/richness)
     if (answers[1] === 1) correctCount++;
     if (answers[2] === 1) correctCount++;
     if (answers[3] === 1) correctCount++;
@@ -257,7 +660,6 @@ app.post('/api/assessments/submit', (req, res) => {
   }
 });
 
-// Certificate lookup
 app.get('/api/certificates/:id', (req, res) => {
   const cert = db.certificates.find(c => c.id.toUpperCase() === req.params.id.toUpperCase());
   if (!cert) {
@@ -266,7 +668,6 @@ app.get('/api/certificates/:id', (req, res) => {
   return res.json(cert);
 });
 
-// Public Verification endpoint
 app.get('/api/verify/:id', (req, res) => {
   const cert = db.certificates.find(c => c.id.toUpperCase() === req.params.id.toUpperCase());
   if (!cert) {
@@ -283,9 +684,6 @@ app.get('/api/verify/:id', (req, res) => {
   });
 });
 
-// -------------------------------------------------------------
-// Admin & Moderation Endpoints
-// -------------------------------------------------------------
 app.get('/api/admin/metrics', (req, res) => {
   return res.json({
     ...db.stats,
@@ -299,7 +697,7 @@ app.get('/api/admin/reports', (req, res) => {
 });
 
 app.post('/api/admin/moderate', (req, res) => {
-  const { reportId, action, notes } = req.body;
+  const { reportId, action } = req.body;
   const rep = db.reports.find(r => r.id === reportId);
   if (rep) {
     rep.status = 'resolved';
@@ -314,7 +712,6 @@ async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (!isProduction) {
-    // Mount Vite dev middleware in development
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -322,7 +719,6 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files in production
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));

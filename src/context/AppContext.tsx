@@ -16,7 +16,8 @@ import {
   INITIAL_CHANNEL_MESSAGES,
   INITIAL_CONVERSATIONS,
   INITIAL_VOCABULARY,
-  INITIAL_EVENTS
+  INITIAL_EVENTS,
+  INITIAL_USERS
 } from '../services/mockData';
 
 export interface AppNotification {
@@ -31,6 +32,13 @@ export interface AppNotification {
 interface AppContextType {
   currentUser: User;
   setCurrentUser: React.Dispatch<React.SetStateAction<User>>;
+  allUsers: User[];
+  registerUser: (data: { username: string; email: string; displayName: string; password?: string; country: string; englishLevel: string }) => Promise<{ success: boolean; error?: string }>;
+  loginUser: (usernameOrEmail: string) => Promise<{ success: boolean; error?: string }>;
+  switchUser: (user: User) => void;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+
   theme: 'dark' | 'light';
   setTheme: (t: 'dark' | 'light') => void;
   accentColor: 'indigo' | 'cyan' | 'violet';
@@ -39,18 +47,20 @@ interface AppContextType {
   // Voice & Room
   activeRoom: SpeakingRoom | null;
   speakingRooms: SpeakingRoom[];
+  refreshRooms: () => Promise<void>;
   isMuted: boolean;
   isDeafened: boolean;
   isSpeaking: boolean;
   hasRaisedHand: boolean;
   roomMessages: ChatMessage[];
-  joinRoom: (room: SpeakingRoom) => void;
-  leaveRoom: () => void;
+  joinRoom: (room: SpeakingRoom, password?: string) => Promise<{ success: boolean; error?: string }>;
+  leaveRoom: () => Promise<void>;
+  closeRoom: (roomId: string) => Promise<{ success: boolean; error?: string }>;
   toggleMute: () => void;
   toggleDeafen: () => void;
   toggleRaiseHand: () => void;
-  sendRoomMessage: (text: string) => void;
-  createSpeakingRoom: (newRoom: Partial<SpeakingRoom>) => SpeakingRoom;
+  sendRoomMessage: (text: string) => Promise<void>;
+  createSpeakingRoom: (newRoom: Partial<SpeakingRoom>) => Promise<{ success: boolean; room?: SpeakingRoom; error?: string }>;
   
   // Communities
   communities: CommunityServer[];
@@ -87,7 +97,10 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User>(CURRENT_USER);
+  const [allUsers, setAllUsers] = useState<User[]>(INITIAL_USERS);
+  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[0]);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [accentColor, setAccentColor] = useState<'indigo' | 'cyan' | 'violet'>('indigo');
 
@@ -116,24 +129,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         senderId: 'usr_maya_002',
         senderName: 'Maya Tanaka',
         senderAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
-        content: 'Hi Arian! Did you check out the 2-minute tech challenge room?',
+        content: 'Hi! Ready to practice some casual conversation today? ☕',
         timestamp: '10:30 AM'
-      },
-      {
-        id: 'dm_2',
-        senderId: 'usr_me_001',
-        senderName: 'Arian Islam',
-        senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-        content: 'Hey Maya! Yes, I hosted it earlier. You should definitely join the next session, it really forces you to structure thoughts quickly!',
-        timestamp: '10:38 AM'
-      },
-      {
-        id: 'dm_3',
-        senderId: 'usr_maya_002',
-        senderName: 'Maya Tanaka',
-        senderAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=250&q=80',
-        content: 'Thanks for the pronunciation tips! See you in the speaking room tomorrow.',
-        timestamp: '10:42 AM'
       }
     ]
   });
@@ -159,53 +156,174 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'achievement',
       timestamp: '2h ago',
       read: false
-    },
-    {
-      id: 'notif_3',
-      title: 'New Friend Request',
-      message: 'Elena from Brazil sent you a friend request.',
-      type: 'friend_request',
-      timestamp: '1d ago',
-      read: true
     }
   ]);
 
-  // Voice room simulator effect
+  // Initial fetch of rooms from backend
+  const refreshRooms = async () => {
+    try {
+      const res = await fetch('/api/rooms');
+      if (res.ok) {
+        const data = await res.json();
+        setSpeakingRooms(data);
+      }
+    } catch (e) {
+      console.warn('Error fetching rooms from server:', e);
+    }
+  };
+
+  useEffect(() => {
+    refreshRooms();
+  }, []);
+
+  // Poll active room messages when in a room
+  useEffect(() => {
+    if (!activeRoom) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/rooms/${activeRoom.id}/messages`);
+        if (res.ok) {
+          const msgs = await res.json();
+          if (msgs.length > 0) {
+            setRoomMessages(msgs);
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 3000);
+    return () => clearInterval(interval);
+  }, [activeRoom]);
+
+  // Voice room speaking pulse simulation if real microphone is quiet
   useEffect(() => {
     if (!activeRoom || isMuted) {
       setIsSpeaking(false);
       return;
     }
 
-    // Gentle speaking pulse to simulate real voice presence
     const interval = setInterval(() => {
       setIsSpeaking(prev => !prev);
     }, 2800);
     return () => clearInterval(interval);
   }, [activeRoom, isMuted]);
 
-  const joinRoom = (room: SpeakingRoom) => {
-    setActiveRoom(room);
-    setIsMuted(false);
-    setIsDeafened(false);
-    setHasRaisedHand(false);
-    setRoomMessages([
-      {
-        id: 'sys_' + Date.now(),
-        senderId: 'sys',
-        senderName: 'Talkie AR Room Bot',
-        senderAvatar: '',
-        content: `Welcome to "${room.title}". Please respect speaking turns and encourage fellow international learners! 🎙️`,
-        timestamp: 'Just now'
+  // Authentication Handlers
+  const registerUser = async (data: {
+    username: string;
+    email: string;
+    displayName: string;
+    password?: string;
+    country: string;
+    englishLevel: string;
+  }) => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        return { success: false, error: resData.error || 'Registration failed' };
       }
-    ]);
+      setAllUsers(prev => [...prev, resData.user]);
+      setCurrentUser(resData.user);
+      setIsAuthModalOpen(false);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error' };
+    }
   };
 
-  const leaveRoom = () => {
+  const loginUser = async (usernameOrEmail: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Login failed' };
+      }
+      setCurrentUser(data.user);
+      setIsAuthModalOpen(false);
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error' };
+    }
+  };
+
+  const switchUser = (user: User) => {
+    setCurrentUser(user);
+  };
+
+  // Room Handlers
+  const joinRoom = async (room: SpeakingRoom, password?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/rooms/${room.id}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: currentUser, password })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Cannot join room' };
+      }
+
+      setActiveRoom(data.room);
+      setIsMuted(false);
+      setIsDeafened(false);
+      setHasRaisedHand(false);
+
+      // Refresh directory
+      refreshRooms();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error joining room' };
+    }
+  };
+
+  const leaveRoom = async () => {
+    if (!activeRoom) return;
+    try {
+      await fetch(`/api/rooms/${activeRoom.id}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser.id })
+      });
+    } catch (e) {}
+
     setActiveRoom(null);
     setIsMuted(false);
     setIsDeafened(false);
     setHasRaisedHand(false);
+    refreshRooms();
+  };
+
+  const closeRoom = async (roomId: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`/api/rooms/${roomId}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostId: currentUser.id })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Failed to close room' };
+      }
+
+      setActiveRoom(null);
+      refreshRooms();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error closing room' };
+    }
   };
 
   const toggleMute = () => {
@@ -224,57 +342,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setHasRaisedHand(prev => !prev);
   };
 
-  const sendRoomMessage = (text: string) => {
-    if (!text.trim()) return;
-    const newMsg: ChatMessage = {
-      id: 'rmsg_' + Date.now(),
-      senderId: currentUser.id,
-      senderName: currentUser.displayName,
-      senderAvatar: currentUser.avatar,
-      senderRole: currentUser.isPremium ? 'Talkie Pro' : undefined,
-      content: text.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setRoomMessages(prev => [...prev, newMsg]);
+  const sendRoomMessage = async (text: string) => {
+    if (!text.trim() || !activeRoom) return;
+
+    try {
+      const res = await fetch(`/api/rooms/${activeRoom.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderId: currentUser.id,
+          senderName: currentUser.displayName,
+          senderAvatar: currentUser.avatar,
+          content: text.trim()
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setRoomMessages(prev => [...prev, data.message]);
+      }
+    } catch (e) {
+      // Local fallback
+      const newMsg: ChatMessage = {
+        id: 'rmsg_' + Date.now(),
+        senderId: currentUser.id,
+        senderName: currentUser.displayName,
+        senderAvatar: currentUser.avatar,
+        content: text.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setRoomMessages(prev => [...prev, newMsg]);
+    }
   };
 
-  const createSpeakingRoom = (roomData: Partial<SpeakingRoom>): SpeakingRoom => {
-    const newRoom: SpeakingRoom = {
-      id: 'rm_' + Date.now(),
-      title: roomData.title || 'Casual Global English Chat',
-      description: roomData.description || 'Open speaking session for global learners.',
-      topic: roomData.topic || 'General conversation',
-      category: roomData.category || 'Everyday English',
-      level: roomData.level || 'All Levels',
-      hostId: currentUser.id,
-      hostName: currentUser.displayName,
-      hostAvatar: currentUser.avatar,
-      capacity: roomData.capacity || 6,
-      isPrivate: !!roomData.isPrivate,
-      isBeginnerFriendly: !!roomData.isBeginnerFriendly,
-      speakingMode: roomData.speakingMode || 'free',
-      activeTopicPrompt: roomData.activeTopicPrompt || roomData.topic || 'Share your thoughts!',
-      participants: [
-        {
-          userId: currentUser.id,
-          displayName: currentUser.displayName,
-          avatar: currentUser.avatar,
-          countryCode: currentUser.countryCode,
-          level: currentUser.englishLevel,
-          role: 'host',
-          isMuted: false,
-          isDeafened: false,
-          isSpeaking: false,
-          raisedHand: false,
-          joinedAt: new Date().toISOString()
-        }
-      ],
-      tags: roomData.tags || ['Global', 'Live'],
-      createdAt: new Date().toISOString()
-    };
+  const createSpeakingRoom = async (roomData: Partial<SpeakingRoom>): Promise<{ success: boolean; room?: SpeakingRoom; error?: string }> => {
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...roomData,
+          hostUser: currentUser
+        })
+      });
 
-    setSpeakingRooms(prev => [newRoom, ...prev]);
-    return newRoom;
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Room creation failed' };
+      }
+
+      setSpeakingRooms(prev => [data.room, ...prev]);
+      setActiveRoom(data.room);
+      return { success: true, room: data.room };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Network error creating room' };
+    }
   };
 
   const sendChannelMessage = (channelId: string, content: string) => {
@@ -356,12 +478,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         currentUser,
         setCurrentUser,
+        allUsers,
+        registerUser,
+        loginUser,
+        switchUser,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
         theme,
         setTheme,
         accentColor,
         setAccentColor,
         activeRoom,
         speakingRooms,
+        refreshRooms,
         isMuted,
         isDeafened,
         isSpeaking,
@@ -369,6 +498,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         roomMessages,
         joinRoom,
         leaveRoom,
+        closeRoom,
         toggleMute,
         toggleDeafen,
         toggleRaiseHand,

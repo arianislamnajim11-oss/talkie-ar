@@ -21,6 +21,7 @@ import { PremiumView } from './components/PremiumView';
 import { AdminView } from './components/AdminView';
 import { SupportPage, SafetyPage, PrivacyPage, TermsPage } from './components/StaticPages';
 import { SearchModal } from './components/SearchModal';
+import { AuthModal } from './components/AuthModal';
 import { Certificate } from './types/index';
 import { INITIAL_CERTIFICATES } from './services/mockData';
 
@@ -135,6 +136,9 @@ const MainAppContent: React.FC = () => {
         onClose={() => setIsSearchOpen(false)}
         navigate={navigate}
       />
+
+      {/* Free Account Registration & Switcher Modal */}
+      <AuthModal />
 
     </div>
   );

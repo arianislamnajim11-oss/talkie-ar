@@ -52,9 +52,11 @@ export function calculateGameScore(
  */
 export function canPerformRoomAction(
   userRole: 'host' | 'moderator' | 'speaker' | 'listener',
-  action: 'mute_others' | 'kick' | 'change_topic' | 'speak' | 'raise_hand'
+  action: 'mute_others' | 'kick' | 'change_topic' | 'close_room' | 'speak' | 'raise_hand'
 ): boolean {
   switch (action) {
+    case 'close_room':
+      return userRole === 'host';
     case 'mute_others':
     case 'kick':
     case 'change_topic':
@@ -66,6 +68,33 @@ export function canPerformRoomAction(
     default:
       return false;
   }
+}
+
+/**
+ * Validates whether a user can join a speaking room based on capacity, status, and privacy
+ */
+export function validateRoomJoin(room: {
+  status?: 'active' | 'closed';
+  capacity: number;
+  currentParticipants: number;
+  isPrivate: boolean;
+  password?: string;
+}, providedPassword?: string): { allowed: boolean; reason?: string } {
+  if (room.status === 'closed') {
+    return { allowed: false, reason: 'This room has been closed by the host.' };
+  }
+  if (room.currentParticipants >= room.capacity) {
+    return { allowed: false, reason: 'Room is at full capacity.' };
+  }
+  if (room.isPrivate) {
+    if (!room.password || room.password.trim() === '') {
+      return { allowed: true };
+    }
+    if (room.password !== providedPassword) {
+      return { allowed: false, reason: 'Incorrect room password.' };
+    }
+  }
+  return { allowed: true };
 }
 
 /**

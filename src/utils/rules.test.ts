@@ -5,6 +5,7 @@ import {
   validateCertificateId,
   calculateGameScore,
   canPerformRoomAction,
+  validateRoomJoin,
   filterSpeakingRooms,
   updateSpeakingStreak,
 } from './rules.ts';
@@ -45,9 +46,32 @@ test('canPerformRoomAction checks permissions strictly', () => {
   assert.equal(canPerformRoomAction('speaker', 'mute_others'), false);
   assert.equal(canPerformRoomAction('listener', 'mute_others'), false);
 
+  assert.equal(canPerformRoomAction('host', 'close_room'), true);
+  assert.equal(canPerformRoomAction('moderator', 'close_room'), false);
+  assert.equal(canPerformRoomAction('speaker', 'close_room'), false);
+
   assert.equal(canPerformRoomAction('speaker', 'speak'), true);
   assert.equal(canPerformRoomAction('listener', 'speak'), false);
   assert.equal(canPerformRoomAction('listener', 'raise_hand'), true);
+});
+
+test('validateRoomJoin enforces capacity, closed state, and private room password', () => {
+  // Test capacity check
+  const fullRoom = { capacity: 4, currentParticipants: 4, isPrivate: false, status: 'active' as const };
+  assert.deepEqual(validateRoomJoin(fullRoom), { allowed: false, reason: 'Room is at full capacity.' });
+
+  // Test closed room check
+  const closedRoom = { capacity: 6, currentParticipants: 2, isPrivate: false, status: 'closed' as const };
+  assert.deepEqual(validateRoomJoin(closedRoom), { allowed: false, reason: 'This room has been closed by the host.' });
+
+  // Test private room with correct vs incorrect password
+  const privateRoom = { capacity: 6, currentParticipants: 2, isPrivate: true, password: 'secret123', status: 'active' as const };
+  assert.deepEqual(validateRoomJoin(privateRoom, 'wrong'), { allowed: false, reason: 'Incorrect room password.' });
+  assert.deepEqual(validateRoomJoin(privateRoom, 'secret123'), { allowed: true });
+
+  // Test valid public join
+  const validPublic = { capacity: 6, currentParticipants: 2, isPrivate: false, status: 'active' as const };
+  assert.deepEqual(validateRoomJoin(validPublic), { allowed: true });
 });
 
 test('filterSpeakingRooms filters by search, level, and category', () => {

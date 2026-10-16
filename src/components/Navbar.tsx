@@ -43,7 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, navigate, onOpenSe
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
-    updatePresence
+    updatePresence,
+    setIsAuthModalOpen
   } = useApp();
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -228,21 +229,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, navigate, onOpenSe
             )}
           </div>
 
-          {/* Premium Upgrade CTA */}
-          {!currentUser.isPremium ? (
-            <button
-              onClick={() => navigate('premium')}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-900 bg-gradient-to-r from-[#F5C451] to-[#F59E0B] hover:brightness-110 shadow-md shadow-[#F5C451]/20 transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-slate-900" />
-              <span>Get Pro</span>
-            </button>
-          ) : (
-            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-[#F5C451] bg-[#F5C451]/10 border border-[#F5C451]/30">
-              <Sparkles className="w-3 h-3 text-[#F5C451]" />
-              <span>PRO</span>
-            </div>
-          )}
+          {/* Quick Create Room Button */}
+          <button
+            onClick={() => navigate('rooms')}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-[#635BFF] to-[#22D3EE] hover:opacity-95 shadow-md shadow-[#635BFF]/25 transition-all"
+            title="Create your own free speaking room"
+          >
+            <Mic className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>+ Create Room</span>
+          </button>
 
           {/* User Profile Dropdown */}
           <div className="relative">
@@ -365,6 +360,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, navigate, onOpenSe
                   >
                     <span>⚙️</span>
                     <span>Account & Audio Settings</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAuthModalOpen(true);
+                      setShowProfileMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-slate-800 text-[#22D3EE] font-bold flex items-center gap-2 border-t border-slate-800/80 mt-1 pt-2"
+                  >
+                    <span>🔄</span>
+                    <span>Switch / Register User Account</span>
                   </button>
                   <button
                     onClick={() => {
